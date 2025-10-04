@@ -1,32 +1,123 @@
-from google.colab import files
-import nbformat
-import json
+# ViT-CIFAR10: Two-Stage W&B Sweeps (Colab)
 
-# Step 1: Upload your notebook
-uploaded = files.upload()  # choose your .ipynb file
-notebook_file = list(uploaded.keys())[0]
-clean_file = "clean_notebook.ipynb"
+Clean Vision Transformer implementation for CIFAR-10 with two-stage hyperparameter optimization using Weights & Biases sweeps. Designed for Google Colab with Drive persistence.
 
-# Step 2: Remove widgets metadata if present using json
-with open(notebook_file, "r", encoding="utf-8") as f:
-    data = json.load(f)
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg) ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg) ![W&B](https://img.shields.io/badge/Weights&Biases-Sweeps-yellow)
 
-if "metadata" in data and "widgets" in data["metadata"]:
-    del data["metadata"]["widgets"]
+## Features
 
-with open(clean_file, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=1)
+- **Pure PyTorch ViT**: PatchEmbed, pre-norm blocks, DropPath, GELU MLP
+- **Robust Training**: AMP, MixUp, RandAugment, cosine+warmup, early stopping  
+- **Two-Stage Optimization**: Fast sweep on proxy subset → full training on best configs
+- **Drive Integration**: Auto-save results, configs, and checkpoints to Google Drive
 
-# Step 3: Re-read and save using nbformat (convert to v4)
-with open(clean_file, "r", encoding="utf-8") as f:
-    nb = nbformat.read(f, as_version=4)  # use v4 instead of v5
+## Quick Setup (Colab)
 
-nbformat.write(nb, clean_file)
+```python
+from pathlib import Path
+from google.colab import drive
 
-# Step 4: Download cleaned notebook
-files.download(clean_file)
+# Mount Drive & create directories
+drive.mount('/content/drive')
+SWEEP_SAVE_DIR = Path("/content/drive/MyDrive/vit_cifar10_sweep_results")
+FULL_SAVE_DIR = Path("/content/drive/MyDrive/vit_cifar10_fulltrain_results")
+for p in [SWEEP_SAVE_DIR, FULL_SAVE_DIR]:
+    p.mkdir(parents=True, exist_ok=True)
+```
 
-print("✅ Notebook cleaned and ready to open in Colab")
+## Stage 1: W&B Bayesian Sweep (20% subset, 20 runs)
+
+```python
+import wandb
+
+# Define sweep configuration
+sweep_config = {
+    "method": "bayes",
+    "metric": {"name": "val_acc", "goal": "maximize"},
+    "parameters": {
+        "patch_size": {"values": [2,4]},
+        "embed_dim": {"values": [128,192]}, 
+        "depth": {"values": [4,6]},
+        "num_heads": {"values": [2,4]},
+        "lr": {"min":1e-5, "max":1e-3},
+        "optimizer": {"values": ["adamw","sgd"]},
+        "batch_size": {"values":[64,128]},
+        "mixup_alpha": {"values":[0.0,0.1]},
+        "subset_ratio": {"value": 0.2}  # 20% proxy dataset
+    }
+}
+
+# Launch sweep
+sweep_id = wandb.sweep(sweep_config, project="vit-cifar10-sweep")
+wandb.agent(sweep_id, function=agent_fn, count=20)
+```
+
+## Stage 2: Full Training on Top-3 Configs
+
+```python
+# Auto-select top 3 configs from Stage 1 results
+top_configs = load_top_configs_from_drive(SWEEP_SAVE_DIR, top_k=3)
+
+# Full training with extended epochs
+for cfg in top_configs:
+    cfg.update({"subset_ratio": 1.0, "epochs": 120, "patience": 15})
+    model, best_acc = run_fulltrain(cfg, save_dir=FULL_SAVE_DIR)
+    
+    # Test evaluation with confusion matrix
+    test_acc, cm = evaluate_model(model, test_loader, device, class_names=CIFAR10_CLASSES)
+```
+
+## Model Architecture
+
+```python
+class VisionTransformer(nn.Module):
+    # Compact ViT for CIFAR-10 (32×32)
+    # - PatchEmbed: Conv2d(kernel=stride=patch_size) 
+    # - Learnable [CLS] token + positional embeddings
+    # - Pre-norm Transformer blocks with DropPath
+    # - Classification head
+```
+
+## Training Stack
+
+- **Data**: Stratified 90/10 split, RandAugment, standard CIFAR-10 normalization
+- **Optimization**: AdamW, cosine LR with warmup, AMP mixed precision
+- **Regularization**: MixUp, DropPath, gradient clipping, early stopping
+- **Monitoring**: W&B logging, best model checkpointing
+
+## Best Config Found
+
+```json
+{
+  "embed_dim": 128, "depth": 6, "num_heads": 4, "patch_size": 4,
+  "lr": 0.000584, "optimizer": "adamw", "scheduler": "cosine",
+  "batch_size": 128, "drop_path_rate": 0.1, "use_randaugment": true
+}
+```
+
+Achieved ~85%+ validation accuracy on CIFAR-10.
+
+## File Structure
+
+```
+/content/drive/MyDrive/
+├── vit_cifar10_sweep_results/     # Stage 1 sweep JSONs/checkpoints
+├── vit_cifar10_fulltrain_results/ # Stage 2 full training results  
+└── vit_cifar10_fulltrain_top3.json # Top configs for Stage 2
+```
+
+## Usage
+
+1. Run all code cells in sequence
+2. Stage 1 automatically saves top configs to Drive
+3. Stage 2 loads configs and runs full training
+4. Results include test accuracy + confusion matrix
+
+## Requirements
+
+PyTorch 2.0+, torchvision, scikit-learn, wandb, seaborn, matplotlib
+
+**Note**: Requires Colab GPU runtime for reasonable training speed.
 # Vision Transformer on CIFAR-10 - q1.ipnyb
 ## 📌 Overview  
 This project trains and evaluates deep learning models on the **CIFAR-10 dataset** using a **two-stage training pipeline**:  
