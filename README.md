@@ -95,7 +95,7 @@ class VisionTransformer(nn.Module):
 }
 ```
 
-Achieved ~85%+ validation accuracy on CIFAR-10.
+Achieved 87.22% validation accuracy on CIFAR-10.
 
 ## File Structure
 
