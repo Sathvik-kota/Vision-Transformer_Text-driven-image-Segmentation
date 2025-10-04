@@ -378,31 +378,6 @@ tracker.process_video(
 - [CLIPSeg: Image Segmentation Using Text and Image Prompts](https://github.com/timojl/clipseg)
 - [CLIP: Learning Transferable Visual Representations](https://github.com/openai/CLIP)
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Facebook Research for SAM2
-- OpenAI for CLIP and CLIPSeg innovations
-- The open-source computer vision community
-
-## 📧 Contact
-
-- **Issues**: Please use the GitHub Issues tab
-- **Discussions**: GitHub Discussions for questions and ideas
-- **Updates**: Watch this repository for the latest developments
-
----
 
 **⭐ Star this repository if you find it useful!**
 
