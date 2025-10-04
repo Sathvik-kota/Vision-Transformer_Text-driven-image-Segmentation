@@ -1,3 +1,32 @@
+from google.colab import files
+import nbformat
+import json
+
+# Step 1: Upload your notebook
+uploaded = files.upload()  # choose your .ipynb file
+notebook_file = list(uploaded.keys())[0]
+clean_file = "clean_notebook.ipynb"
+
+# Step 2: Remove widgets metadata if present using json
+with open(notebook_file, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+if "metadata" in data and "widgets" in data["metadata"]:
+    del data["metadata"]["widgets"]
+
+with open(clean_file, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=1)
+
+# Step 3: Re-read and save using nbformat (convert to v4)
+with open(clean_file, "r", encoding="utf-8") as f:
+    nb = nbformat.read(f, as_version=4)  # use v4 instead of v5
+
+nbformat.write(nb, clean_file)
+
+# Step 4: Download cleaned notebook
+files.download(clean_file)
+
+print("✅ Notebook cleaned and ready to open in Colab")
 # Vision Transformer on CIFAR-10 - q1.ipnyb
 ## 📌 Overview  
 This project trains and evaluates deep learning models on the **CIFAR-10 dataset** using a **two-stage training pipeline**:  
